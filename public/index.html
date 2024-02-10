@@ -2,10 +2,161 @@
 <html>
 <head>
   <title>Multiplayer Game</title>
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <style>
+    .player {
+      width: 50px;
+      height: 50px;
+      position: absolute;
+      -webkit-transition-duration: .05s;
+      transition-duration: .05s;
+      font-family: 'Pixelify Sans', sans-serif;
+      position: relative;
+    }
+    .playerText, .playerName {
+      position: absolute;
+      top: -20px;
+      max-height: 20px;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .playerName {
+      top: 50px;
+    }
+    .chatBox {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 10%;
+      background-color: rgb(240,240,240);
+      z-index: 10;
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+    }
+    .chatInput, .chatButton {
+      margin: 1%;
+      width: 80%;
+      font-family: 'Pixelify Sans', sans-serif;
+      font-size: 30px;
+    }
+    .chatButton {
+      width: 15%;
+    }
+  </style>
 </head>
 <body>
-  <div>Hello world!</div>
+  <div class="chatBox">
+    <input class="chatInput">
+    <button class="chatButton">Send Message</button>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const playerElements = {};
+
+
+    socket.on('init', ({ players }) => {
+      for (const playerId in players) {
+        const player = players[playerId];
+        createPlayerElement(player);
+      }
+    });
+
+
+    socket.on('newPlayer', (player) => {
+      createPlayerElement(player);
+    });
+
+
+    function createPlayerElement(player) {
+      const playerElement = document.createElement('div');
+      playerElement.className = 'player';
+      playerElement.style.background = player.color;
+      playerElement.style.left = player.x + 'px';
+      playerElement.style.top = player.y + 'px';
+      const text = document.createElement('text');
+      text.innerText = player.message;
+      text.className = 'playerText';
+     
+      const name = document.createElement('text');
+      name.innerText = player.name;
+      name.className = 'playerName';
+      name.style.color = player.color
+
+
+      playerElement.insertAdjacentElement('afterbegin', name);
+      playerElement.insertAdjacentElement('afterbegin', text);
+
+      document.body.appendChild(playerElement);
+      playerElements[player.id] = playerElement;
+      }
+
+      socket.on('playerDisconnected', (playerId) => {
+      const player = playerElements[playerId];
+      player.remove();
+      delete playerElements[playerId];
+    });
+
+    document.addEventListener('keydown', (e) => {
+      let direction;
+      if (e.key === 'ArrowUp') direction = 'up';
+      else if (e.key === 'ArrowDown') direction = 'down';
+      else if (e.key === 'ArrowLeft') direction = 'left';
+      else if (e.key === 'ArrowRight') direction = 'right';
+      else if (e.key === 'Enter') {
+        socket.emit('chat message', input.value);
+        input.value = '';
+        input.focus();
+      }
+
+
+
+      if (direction) {
+        socket.emit('move', direction);
+      } 
+    });
+
+    socket.on('playerMoved', ({ playerId, x, y }) => {
+      const player = playerElements[playerId];
+      player.style.left = x + 'px';
+      player.style.top = y + 'px';
+
+
+      player.style.webkitTransform = 'rotate(10deg)';
+      runner = setInterval(function(){
+        player.style.webkitTransform = 'rotate(0deg)';
+        clearInterval(runner);
+      },50)
+    });
+
+    const person = prompt("Enter your username: ");
+    socket.emit('nameGiven', person);
+
+    const form = document.getElementsByClassName('chatButton')[0];
+    const input = document.getElementsByClassName('chatInput')[0];
+    input.focus();
+
+
+    form.addEventListener('click', (e) => {
+      socket.emit('chat message', input.value);
+      input.value = '';
+    });
+
+    socket.on('messageSent', ({ playerId, msg }) => {
+      const player = playerElements[playerId];
+      player.children[0].innerText = msg;
+    });
+
+
+    socket.on('nameSent', ({ playerId, name }) => {
+      const player = playerElements[playerId];
+      player.children[1].innerText = name;
+    });
+
+  </script> 
 </body>
 </html>
