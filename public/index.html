@@ -2,16 +2,16 @@
 <html>
 <head>
   <title>Multiplayer Game</title>
-  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500&display=swap" rel="stylesheet">
   <style>
+
     .player {
       width: 50px;
       height: 50px;
       position: absolute;
       -webkit-transition-duration: .05s;
-      transition-duration: .05s;
       font-family: 'Pixelify Sans', sans-serif;
       position: relative;
     }
@@ -43,12 +43,21 @@
       font-family: 'Pixelify Sans', sans-serif;
       font-size: 30px;
     }
+    .wordHeader {
+      text-align: center;
+      width: 100%;
+      margin: 0px;
+      margin-top: 3%;
+      font-family: 'Pixelify Sans', sans-serif;
+      font-size: 80px;
+    }
     .chatButton {
       width: 15%;
     }
   </style>
 </head>
 <body>
+  <div class="wordHeader">loading...</div>
   <div class="chatBox">
     <input class="chatInput">
     <button class="chatButton">Send Message</button>
@@ -56,75 +65,29 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+
     const playerElements = {};
 
-
-    socket.on('init', ({ players }) => {
+    socket.on('init', ({ players, word }) => {
+      const person = prompt("Enter your username: ");
+      socket.emit('nameGiven', person);
+      
       for (const playerId in players) {
         const player = players[playerId];
         createPlayerElement(player);
       }
-    });
 
+      document.getElementsByClassName("wordHeader")[0].innerText = word;
+    });
 
     socket.on('newPlayer', (player) => {
       createPlayerElement(player);
-    });
-
-
-    function createPlayerElement(player) {
-      const playerElement = document.createElement('div');
-      playerElement.className = 'player';
-      playerElement.style.background = player.color;
-      playerElement.style.left = player.x + 'px';
-      playerElement.style.top = player.y + 'px';
-      const text = document.createElement('text');
-      text.innerText = player.message;
-      text.className = 'playerText';
-     
-      const name = document.createElement('text');
-      name.innerText = player.name;
-      name.className = 'playerName';
-      name.style.color = player.color
-
-
-      playerElement.insertAdjacentElement('afterbegin', name);
-      playerElement.insertAdjacentElement('afterbegin', text);
-
-      document.body.appendChild(playerElement);
-      playerElements[player.id] = playerElement;
-      }
-
-      socket.on('playerDisconnected', (playerId) => {
-      const player = playerElements[playerId];
-      player.remove();
-      delete playerElements[playerId];
-    });
-
-    document.addEventListener('keydown', (e) => {
-      let direction;
-      if (e.key === 'ArrowUp') direction = 'up';
-      else if (e.key === 'ArrowDown') direction = 'down';
-      else if (e.key === 'ArrowLeft') direction = 'left';
-      else if (e.key === 'ArrowRight') direction = 'right';
-      else if (e.key === 'Enter') {
-        socket.emit('chat message', input.value);
-        input.value = '';
-        input.focus();
-      }
-
-
-
-      if (direction) {
-        socket.emit('move', direction);
-      } 
     });
 
     socket.on('playerMoved', ({ playerId, x, y }) => {
       const player = playerElements[playerId];
       player.style.left = x + 'px';
       player.style.top = y + 'px';
-
 
       player.style.webkitTransform = 'rotate(10deg)';
       runner = setInterval(function(){
@@ -133,30 +96,86 @@
       },50)
     });
 
-    const person = prompt("Enter your username: ");
-    socket.emit('nameGiven', person);
+    socket.on("reviveAll", () => {
+      for (var id of Object.keys(playerElements)) {
+        playerElements[id].style.opacity = 1;
+      }
+    })
 
-    const form = document.getElementsByClassName('chatButton')[0];
-    const input = document.getElementsByClassName('chatInput')[0];
-    input.focus();
+    socket.on("newWord", (word) => {
+      document.getElementsByClassName("wordHeader")[0].innerText = word;
+    })
 
-
-    form.addEventListener('click', (e) => {
-      socket.emit('chat message', input.value);
-      input.value = '';
-    });
-
-    socket.on('messageSent', ({ playerId, msg }) => {
+    socket.on('messageSent', ({ playerId, msg, correct }) => {
       const player = playerElements[playerId];
       player.children[0].innerText = msg;
-    });
 
+      if (!correct) {
+        player.style.opacity = .1;
+      }
+      
+    });
 
     socket.on('nameSent', ({ playerId, name }) => {
       const player = playerElements[playerId];
       player.children[1].innerText = name;
     });
 
-  </script> 
+    socket.on('playerDisconnected', (playerId) => {
+      const player = playerElements[playerId];
+      player.remove();
+      delete playerElements[playerId];
+    });
+
+    const form = document.getElementsByClassName('chatButton')[0];
+    const input = document.getElementsByClassName('chatInput')[0];
+    input.focus();
+
+    document.addEventListener('keydown', (e) => {
+      let direction;
+      if (e.key === 'ArrowUp') direction = 'up';
+      else if (e.key === 'ArrowDown') direction = 'down';
+      else if (e.key === 'ArrowLeft') direction = 'left';
+      else if (e.key === 'ArrowRight') direction = 'right';
+
+      if (direction) {
+        socket.emit('move', direction);
+      } else if (e.key === 'Enter') {
+        socket.emit('chat message', input.value);
+        input.value = '';
+        input.focus();
+      }
+    });
+
+    form.addEventListener('click', (e) => {
+      socket.emit('chat message', input.value);
+      input.value = '';
+    });
+
+    function createPlayerElement(player) {
+      const playerElement = document.createElement('div');
+
+      const text = document.createElement('text');
+      text.innerText = player.message;
+      text.className = 'playerText';
+      
+      const name = document.createElement('text');
+      name.innerText = player.name;
+      name.className = 'playerName';
+      name.style.color = player.color
+
+      playerElement.insertAdjacentElement('afterbegin', name);
+      playerElement.insertAdjacentElement('afterbegin', text);
+
+      playerElement.className = 'player';
+      playerElement.style.background = player.color;
+      playerElement.style.left = player.x + 'px';
+      playerElement.style.top = player.y + 'px';
+      playerElement.style.opacity = player.state == "dead" ? .1 : 1
+
+      document.body.appendChild(playerElement);
+      playerElements[player.id] = playerElement;
+    }
+  </script>
 </body>
 </html>
